@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:pike/Pages/home_page.dart';
+import 'package:pike/Services/config.dart';
 import 'package:pike/Utilities/colors.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initConfig();
+  final config = await loadConfig();
+  print(config['selected_model']);
   runApp(const MyApp());
 }
 
