@@ -2,7 +2,7 @@ Under Development...
 
 <div align="center">
 
-  <img src="resources/Pike-no-bg.png" alt="Pike Logo" width="160">
+  <img src="Resources/Pike-no-bg.png" alt="Pike Logo" width="160">
 
   # Pike
 
