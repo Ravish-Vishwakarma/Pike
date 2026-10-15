@@ -12,6 +12,17 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  void _changePageIndex(index) {
+    setState(() {
+      currentIndex = index;
+      pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
   int currentIndex = 0;
   final PageController pageController = PageController();
   @override
@@ -24,7 +35,15 @@ class _HomePageState extends State<HomePage> {
             currentIndex = index;
           });
         },
-        children: const [ChatPage(), ModelsPage(), SettingsPage()],
+        children: [
+          ChatPage(
+            onChangeIndex: (index) {
+              _changePageIndex(index);
+            },
+          ),
+          ModelsPage(),
+          SettingsPage(),
+        ],
       ),
 
       bottomNavigationBar: MyBottomNavBar(
