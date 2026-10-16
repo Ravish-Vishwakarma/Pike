@@ -42,7 +42,11 @@ class _HomePageState extends State<HomePage> {
             },
           ),
           ModelsPage(),
-          SettingsPage(),
+          SettingsPage(
+            onChangeIndex: (index) {
+              _changePageIndex(index);
+            },
+          ),
         ],
       ),
 

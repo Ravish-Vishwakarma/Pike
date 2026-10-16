@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pike/Pages/chat_history_page.dart';
 import 'package:pike/Utilities/colors.dart';
 import 'package:pike/Services/config.dart';
+import 'package:pike/Utilities/model_not_downloaded_navigator.dart';
 
 class ChatPage extends StatefulWidget {
   final ValueChanged<int> onChangeIndex;
@@ -52,8 +53,8 @@ class _ChatPageState extends State<ChatPage> {
                   contentPadding: EdgeInsets.zero,
                 ),
               )
-            : null,
-        centerTitle: true,
+            : Text("Chat", style: TextStyle(color: Colors.white)),
+        // centerTitle: true,
         backgroundColor: MyColors.primary,
         actions: [
           IconButton(
@@ -78,51 +79,6 @@ class _ChatPageState extends State<ChatPage> {
                 },
               ),
             ),
-    );
-  }
-}
-
-class PleaseDownloadModelWidget extends StatelessWidget {
-  final VoidCallback changePageToChat;
-  const PleaseDownloadModelWidget({super.key, required this.changePageToChat});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Card(
-            elevation: 4,
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "No Model Is Downloaded\nPlease Download a Model!",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: changePageToChat,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text("Download"),
-                        SizedBox(width: 10),
-                        Icon(Icons.arrow_forward_rounded),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
