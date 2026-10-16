@@ -17,7 +17,7 @@ class _SettingsPageState extends State<SettingsPage>
   @override
   bool get wantKeepAlive => true;
 
-  // ==================== VARIABLES ==================== //
+  // -------------------- VARIABLES -------------------- //
   bool isModelSelected = false;
 
   void checkModelSelected() async {
@@ -29,14 +29,14 @@ class _SettingsPageState extends State<SettingsPage>
     }
   }
 
-  // ==================== INIT STATE ==================== //
+  // -------------------- INIT STATE -------------------- //
   @override
   void initState() {
     super.initState();
     checkModelSelected();
   }
 
-  // ==================== BUILDER ==================== //
+  // -------------------- BUILDER -------------------- //
   @override
   Widget build(BuildContext context) {
     super.build(context);

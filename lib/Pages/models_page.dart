@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pike/Utilities/colors.dart';
 import 'package:pike/Services/config.dart';
+import 'package:pike/Utilities/models.dart';
 
 class ModelsPage extends StatefulWidget {
   const ModelsPage({super.key});
@@ -14,23 +15,28 @@ class _ModelsPageState extends State<ModelsPage>
   @override
   bool get wantKeepAlive => true;
 
-  // ==================== VARIABLES ==================== //
-  String model_name = "";
-  getModelName() async {
+  // -------------------- VARIABLES -------------------- //
+  String modelName = "";
+  Future<void> getModelName() async {
     final name = await getSelectedModelName();
+
+    if (!mounted) return;
+
     setState(() {
-      model_name = name;
+      modelName = name;
     });
   }
 
-  // ==================== INIT STATE ==================== //
+  final models = allModels.values.toList();
+
+  // -------------------- INIT STATE -------------------- //
   @override
   void initState() {
     super.initState();
     getModelName();
   }
 
-  // ==================== BUILDER ==================== //
+  // -------------------- BUILDER -------------------- //
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -49,17 +55,18 @@ class _ModelsPageState extends State<ModelsPage>
       body: SingleChildScrollView(
         child: Column(
           children: [
-            SelectedModelWidget(modelName: model_name),
+            SelectedModelWidget(modelName: modelName),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
               child: Divider(),
             ),
-            ElevatedButton(
-              child: Text("Change"),
-              onPressed: () {
-                setState(() {
-                  model_name = "New One";
-                });
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: models.length,
+              itemBuilder: (context, index) {
+                final model = models[index];
+                return ModelDownloadCard(model: model);
               },
             ),
           ],
@@ -69,6 +76,7 @@ class _ModelsPageState extends State<ModelsPage>
   }
 }
 
+// ====================================================================== //
 class SelectedModelWidget extends StatefulWidget {
   final String modelName;
   const SelectedModelWidget({super.key, required this.modelName});
@@ -91,6 +99,83 @@ class _SelectedModelWidgetState extends State<SelectedModelWidget> {
           ),
           Text(widget.modelName),
         ],
+      ),
+    );
+  }
+}
+
+// ====================================================================== //
+class ModelDownloadCard extends StatelessWidget {
+  final AIModel model;
+
+  const ModelDownloadCard({super.key, required this.model});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+      child: Card(
+        child: ExpansionTile(
+          shape: const Border(),
+          title: Text(model.name),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${model.parameters} parameters - ${model.size}'),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 5,
+                children: [
+                  if (model.supportsVision) _capabilityBadge('Vision'),
+
+                  if (model.supportsText) _capabilityBadge('Text'),
+                ],
+              ),
+            ],
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              child: Divider(),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(0),
+              child: Column(
+                children: [
+                  Text('Model ID: ${model.id}'),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      // Add your download logic here.
+                    },
+                    child: const Text('Download Model'),
+                  ),
+                  const SizedBox(height: 5),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // -------------------- WIDGETS -------------------- //
+  Widget _capabilityBadge(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade400,
+        border: Border.all(color: Colors.grey.shade400, width: 0.7),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 13,
+          height: 1.2,
+          color: Colors.black87,
+        ),
       ),
     );
   }

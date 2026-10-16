@@ -17,7 +17,7 @@ class _ChatPageState extends State<ChatPage>
   @override
   bool get wantKeepAlive => true;
 
-  // ==================== VARIABLES ==================== //
+  // -------------------- VARIABLES -------------------- //
   TextEditingController chat_name_controller = TextEditingController();
   bool isModelSelected = false;
 
@@ -30,14 +30,14 @@ class _ChatPageState extends State<ChatPage>
     }
   }
 
-  // ==================== INIT STATE ==================== //
+  // -------------------- INIT STATE -------------------- //
   @override
   void initState() {
     super.initState();
     checkModelSelected();
   }
 
-  // ==================== BUILDER ==================== //
+  // -------------------- BUILDER -------------------- //
   @override
   Widget build(BuildContext context) {
     super.build(context);
