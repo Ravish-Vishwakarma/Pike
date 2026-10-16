@@ -12,7 +12,12 @@ class SettingsPage extends StatefulWidget {
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class _SettingsPageState extends State<SettingsPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  // ==================== VARIABLES ==================== //
   bool isModelSelected = false;
 
   void checkModelSelected() async {
@@ -24,14 +29,18 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  // ==================== INIT STATE ==================== //
   @override
   void initState() {
     super.initState();
     checkModelSelected();
   }
 
+  // ==================== BUILDER ==================== //
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     return Scaffold(
       backgroundColor: MyColors.background,
       appBar: AppBar(

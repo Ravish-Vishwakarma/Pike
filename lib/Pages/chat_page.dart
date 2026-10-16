@@ -12,7 +12,12 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  // ==================== VARIABLES ==================== //
   TextEditingController chat_name_controller = TextEditingController();
   bool isModelSelected = false;
 
@@ -25,14 +30,17 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  // ==================== INIT STATE ==================== //
   @override
   void initState() {
     super.initState();
     checkModelSelected();
   }
 
+  // ==================== BUILDER ==================== //
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       backgroundColor: MyColors.background,
       appBar: AppBar(
