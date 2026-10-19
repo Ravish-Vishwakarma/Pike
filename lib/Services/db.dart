@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 Database? _database;
+final ValueNotifier<int> chatListChangesNotifier = ValueNotifier(0);
+final ValueNotifier<int> chatHistoryClearedNotifier = ValueNotifier(0);
 
 Future<Database> get database async {
   final existingDatabase = _database;
@@ -36,7 +39,7 @@ Future<void> initDatabase() async {
 Future<int> createChat({String? modelName}) async {
   final db = await database;
   final now = DateTime.now().toIso8601String();
-  return db.transaction((transaction) async {
+  final id = await db.transaction((transaction) async {
     final id = await transaction.insert('conversations', {
       'title': '',
       'created_at': now,
@@ -51,6 +54,8 @@ Future<int> createChat({String? modelName}) async {
     );
     return id;
   });
+  chatListChangesNotifier.value++;
+  return id;
 }
 
 Future<List<ChatSession>> getAllChats() async {
@@ -133,6 +138,17 @@ Future<void> deleteChat(int id) async {
     await transaction.delete('chat', where: 'chat_id = ?', whereArgs: [id]);
     await transaction.delete('conversations', where: 'id = ?', whereArgs: [id]);
   });
+  chatListChangesNotifier.value++;
+}
+
+Future<void> deleteAllChats() async {
+  final db = await database;
+  await db.transaction((transaction) async {
+    await transaction.delete('chat');
+    await transaction.delete('conversations');
+  });
+  chatListChangesNotifier.value++;
+  chatHistoryClearedNotifier.value++;
 }
 
 Future<void> _createChatTables(DatabaseExecutor db) async {

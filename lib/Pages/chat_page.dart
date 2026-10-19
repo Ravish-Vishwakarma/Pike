@@ -41,7 +41,20 @@ class _ChatPageState extends State<ChatPage>
   void initState() {
     super.initState();
     selectedModelNameNotifier.addListener(_onSelectedModelChanged);
+    chatHistoryClearedNotifier.addListener(_onChatHistoryCleared);
     unawaited(_loadSelectedModelName());
+  }
+
+  void _onChatHistoryCleared() {
+    ++_modelGeneration;
+    _chatService.startNewChat();
+    setState(() {
+      _chatId = null;
+      _chatTitle = 'New chat';
+      _chatNameController.text = _chatTitle;
+      _messages.clear();
+      _isGenerating = false;
+    });
   }
 
   Future<void> _loadSelectedModelName() async {
@@ -264,6 +277,7 @@ class _ChatPageState extends State<ChatPage>
   @override
   void dispose() {
     selectedModelNameNotifier.removeListener(_onSelectedModelChanged);
+    chatHistoryClearedNotifier.removeListener(_onChatHistoryCleared);
     unawaited(_chatService.dispose());
     _messageController.dispose();
     _chatNameController.dispose();
