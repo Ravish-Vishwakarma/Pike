@@ -40,6 +40,8 @@ dependencies:
   flutter_litert: ^3.6.0
   flutter_litert_lm: ^0.3.0
   flutter_local_notifications: ^17.2.0
+  background_downloader: ^9.6.4
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:

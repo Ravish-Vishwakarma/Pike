@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:pike/Services/downloader.dart';
 import 'package:pike/Utilities/colors.dart';
 import 'package:pike/Services/config.dart';
 import 'package:pike/Utilities/models.dart';
+import 'package:path/path.dart' as p;
 
 class ModelsPage extends StatefulWidget {
   const ModelsPage({super.key});
@@ -17,6 +19,11 @@ class _ModelsPageState extends State<ModelsPage>
 
   // -------------------- VARIABLES -------------------- //
   String modelName = "";
+  final models = allModels.values.toList();
+  Set<String> downloadedModels = {};
+  List<AIModel> downloadableModel = [];
+
+  // ------------------- Functions -------------------- //
   Future<void> getModelName() async {
     final name = await getSelectedModelName();
 
@@ -27,13 +34,29 @@ class _ModelsPageState extends State<ModelsPage>
     });
   }
 
-  final models = allModels.values.toList();
+  Future<void> loadDownloadableModels() async {
+    final files = await Downloader.getAllDownloadedFiles();
+
+    if (!mounted) return;
+
+    final fileNames = files.map((file) => p.basename(file)).toSet();
+
+    final availableModels = models.where((model) {
+      return !fileNames.contains(model.filename);
+    }).toList();
+
+    setState(() {
+      downloadedModels = fileNames;
+      downloadableModel = availableModels;
+    });
+  }
 
   // -------------------- INIT STATE -------------------- //
   @override
   void initState() {
     super.initState();
     getModelName();
+    loadDownloadableModels();
   }
 
   // -------------------- BUILDER -------------------- //
@@ -55,6 +78,15 @@ class _ModelsPageState extends State<ModelsPage>
       body: SingleChildScrollView(
         child: Column(
           children: [
+            ElevatedButton(
+              onPressed: () {
+                print(downloadedModels);
+                for (var mo in downloadableModel) {
+                  print(mo.filename);
+                }
+              },
+              child: Text("getAllDownloadedFiles"),
+            ),
             SelectedModelWidget(modelName: modelName),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
@@ -63,12 +95,13 @@ class _ModelsPageState extends State<ModelsPage>
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: models.length,
+              itemCount: downloadableModel.length,
               itemBuilder: (context, index) {
-                final model = models[index];
+                final model = downloadableModel[index];
                 return ModelDownloadCard(model: model);
               },
             ),
+            SizedBox(height: 50),
           ],
         ),
       ),
@@ -146,7 +179,7 @@ class ModelDownloadCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   ElevatedButton(
                     onPressed: () {
-                      // Add your download logic here.
+                      Downloader.downloadFile(model.download, model.filename);
                     },
                     child: const Text('Download Model'),
                   ),
