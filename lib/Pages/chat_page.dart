@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_litert_lm/flutter_litert_lm.dart';
 import 'package:pike/Pages/chat_history_page.dart';
 import 'package:pike/Services/config.dart';
 import 'package:pike/Services/local_chat_service.dart';
@@ -25,8 +24,6 @@ class _ChatPageState extends State<ChatPage>
   final LocalChatService _chatService = LocalChatService();
   final List<_ChatMessage> _messages = [];
 
-  StreamSubscription<LiteLmMessage>? _responseSubscription;
-  Completer<void>? _responseCompleter;
   String _loadedModelName = 'none';
   String? _modelError;
   bool _isModelSelected = false;
@@ -63,11 +60,6 @@ class _ChatPageState extends State<ChatPage>
 
     _loadedModelName = modelName;
     final generation = ++_modelGeneration;
-    final responseSubscription = _responseSubscription;
-    _responseSubscription = null;
-    _responseCompleter?.complete();
-    _responseCompleter = null;
-
     setState(() {
       _isModelSelected = modelName != 'none';
       _isModelLoading = _isModelSelected;
@@ -76,15 +68,10 @@ class _ChatPageState extends State<ChatPage>
       _messages.clear();
     });
 
-    unawaited(_loadModel(modelName, generation, responseSubscription));
+    unawaited(_loadModel(modelName, generation));
   }
 
-  Future<void> _loadModel(
-    String modelName,
-    int generation,
-    StreamSubscription<LiteLmMessage>? previousResponse,
-  ) async {
-    await previousResponse?.cancel();
+  Future<void> _loadModel(String modelName, int generation) async {
     try {
       if (modelName != 'none') {
         await _chatService.loadModel(modelName);
@@ -109,7 +96,7 @@ class _ChatPageState extends State<ChatPage>
       _modelError = null;
       _messages.clear();
     });
-    unawaited(_loadModel(_loadedModelName, generation, null));
+    unawaited(_loadModel(_loadedModelName, generation));
   }
 
   Future<void> _sendMessage() async {
@@ -131,70 +118,30 @@ class _ChatPageState extends State<ChatPage>
       _isGenerating = true;
     });
     _scrollToBottom();
-    final completer = Completer<void>();
-    _responseCompleter = completer;
-    StreamSubscription<LiteLmMessage>? subscription;
     try {
-      subscription = _chatService
-          .sendMessage(text)
-          .listen(
-            (delta) {
-              if (!mounted || generation != _modelGeneration) return;
-              setState(() => reply.text += delta.text);
-              _scrollToBottom();
-            },
-            onError: (Object error) {
-              if (mounted && generation == _modelGeneration) {
-                setState(() {
-                  _isGenerating = false;
-                  if (reply.text.isEmpty) {
-                    _messages.remove(reply);
-                    _modelError = 'Could not generate a response: $error';
-                  } else {
-                    reply.error = true;
-                    reply.text += '\n\nResponse interrupted: $error';
-                  }
-                });
-              }
-              _completeResponse(completer);
-            },
-            onDone: () {
-              if (mounted && generation == _modelGeneration) {
-                setState(() {
-                  _isGenerating = false;
-                  if (reply.text.isEmpty) {
-                    _messages.remove(reply);
-                    _modelError = 'The model returned an empty response.';
-                  }
-                });
-              }
-              _completeResponse(completer);
-            },
-          );
-      _responseSubscription = subscription;
+      final response = await _chatService.sendMessage(text);
+      if (!mounted || generation != _modelGeneration) return;
+      final responseText = response.text.trim();
+      setState(() {
+        _isGenerating = false;
+        if (responseText.isEmpty) {
+          reply
+            ..error = true
+            ..text = 'The model returned an empty response.';
+        } else {
+          reply.text = responseText;
+        }
+      });
+      _scrollToBottom();
     } catch (error) {
       if (mounted && generation == _modelGeneration) {
         setState(() {
           _isGenerating = false;
-          _messages.remove(reply);
-          _modelError = 'Could not generate a response: $error';
+          reply
+            ..error = true
+            ..text = 'Could not generate a response: $error';
         });
       }
-      _completeResponse(completer);
-    }
-    await completer.future;
-    if (identical(_responseCompleter, completer)) {
-      _responseCompleter = null;
-    }
-    if (identical(_responseSubscription, subscription)) {
-      _responseSubscription = null;
-    }
-  }
-
-  void _completeResponse(Completer<void> completer) {
-    if (!completer.isCompleted) completer.complete();
-    if (identical(_responseCompleter, completer)) {
-      _responseCompleter = null;
     }
   }
 
@@ -215,9 +162,6 @@ class _ChatPageState extends State<ChatPage>
   @override
   void dispose() {
     selectedModelNameNotifier.removeListener(_onSelectedModelChanged);
-    _responseCompleter?.complete();
-    _responseCompleter = null;
-    _responseSubscription?.cancel();
     unawaited(_chatService.dispose());
     _messageController.dispose();
     _chatNameController.dispose();
