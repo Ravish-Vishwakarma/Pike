@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 // ================================ CONFIG ================================ //
 
 const String configFileName = "config.json";
+final ValueNotifier<String> selectedModelNameNotifier = ValueNotifier('none');
 
 Future<File> _getConfigFile() async {
   final dir = await getApplicationDocumentsDirectory();
@@ -51,10 +53,15 @@ Future<void> changeConfigSelectedModelName(String modelName) async {
   final config = await loadConfig();
   config['selected_model'] = modelName;
   await saveConfig(config);
+  selectedModelNameNotifier.value = modelName;
 }
 
 // Get Selected Model Name
 Future<String> getSelectedModelName() async {
   final config = await loadConfig();
-  return config['selected_model'];
+  final modelName = config['selected_model'] as String? ?? 'none';
+  if (selectedModelNameNotifier.value != modelName) {
+    selectedModelNameNotifier.value = modelName;
+  }
+  return modelName;
 }
