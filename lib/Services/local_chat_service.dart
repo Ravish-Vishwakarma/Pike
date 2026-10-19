@@ -1,5 +1,6 @@
 import 'package:litertlm/litertlm.dart';
 import 'package:pike/Services/downloader.dart';
+import 'package:pike/Services/db.dart';
 import 'package:pike/Utilities/models.dart';
 
 class LocalChatService {
@@ -9,6 +10,28 @@ class LocalChatService {
   int _loadGeneration = 0;
   bool _disposed = false;
   bool _isSending = false;
+
+  void restoreHistory(List<ChatMessage> messages) {
+    _history.clear();
+    ChatMessage? pendingUserMessage;
+    for (final message in messages) {
+      if (message.isAI) {
+        final userMessage = pendingUserMessage;
+        if (userMessage != null) {
+          _history
+            ..add(Message.user(userMessage.text))
+            ..add(Message.modelText(message.text));
+          pendingUserMessage = null;
+        }
+      } else {
+        pendingUserMessage = message;
+      }
+    }
+  }
+
+  void startNewChat() {
+    _history.clear();
+  }
 
   Future<void> loadModel(String modelName) async {
     final generation = ++_loadGeneration;
@@ -50,7 +73,7 @@ class LocalChatService {
     }
   }
 
-  Future<Message> sendMessage(String text) async {
+  Stream<Message> sendMessage(String text) async* {
     final engine = _engine;
     if (engine == null) {
       throw StateError('The selected model is not ready.');
@@ -62,11 +85,16 @@ class LocalChatService {
     _isSending = true;
     Conversation? conversation;
     final generation = _loadGeneration;
+    final responseText = StringBuffer();
+    var completed = false;
     try {
       conversation = await engine.createConversation(
         ConversationConfig(
           systemMessage: Message.system(
-            'You are a helpful assistant. Be concise.',
+            'You are a helpful assistant. Answer the latest user message '
+            'directly and concisely. Earlier messages are context only: do '
+            'not answer or continue an earlier question unless the latest '
+            'message explicitly asks you to.',
           ),
           initialMessages: List.unmodifiable(_history),
           sessionConfig: SessionConfig(
@@ -85,21 +113,28 @@ class LocalChatService {
       }
       _activeConversation = conversation;
 
-      final userMessage = Message.user(text);
-      final response = await conversation.sendMessage(userMessage);
-      if (response.text.trim().isEmpty) {
+      await for (final message in conversation.sendMessageStream(
+        Message.user(text),
+      )) {
+        if (message.isEmpty) continue;
+        responseText.write(message.text);
+        yield message;
+      }
+      completed = true;
+
+      if (responseText.toString().trim().isEmpty) {
         throw StateError('The model returned an empty response.');
       }
       _history
-        ..add(userMessage)
-        ..add(Message.modelText(response.text.trim()));
-      return response;
+        ..add(Message.user(text))
+        ..add(Message.modelText(responseText.toString().trim()));
     } finally {
       try {
         if (conversation != null) {
           if (identical(conversation, _activeConversation)) {
             _activeConversation = null;
           }
+          if (!completed) await conversation.cancel();
           await conversation.dispose();
         }
       } finally {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pike/Pages/chat_history_page.dart';
 import 'package:pike/Services/config.dart';
+import 'package:pike/Services/db.dart';
 import 'package:pike/Services/local_chat_service.dart';
 import 'package:pike/Utilities/colors.dart';
 import 'package:pike/Utilities/model_not_downloaded_navigator.dart';
@@ -30,6 +31,8 @@ class _ChatPageState extends State<ChatPage>
   bool _isModelLoading = false;
   bool _isGenerating = false;
   int _modelGeneration = 0;
+  int? _chatId;
+  String _chatTitle = 'New chat';
 
   @override
   bool get wantKeepAlive => true;
@@ -65,6 +68,9 @@ class _ChatPageState extends State<ChatPage>
       _isModelLoading = _isModelSelected;
       _isGenerating = false;
       _modelError = null;
+      _chatId = null;
+      _chatTitle = 'New chat';
+      _chatNameController.text = _chatTitle;
       _messages.clear();
     });
 
@@ -119,28 +125,124 @@ class _ChatPageState extends State<ChatPage>
     });
     _scrollToBottom();
     try {
-      final response = await _chatService.sendMessage(text);
+      var chatId = _chatId;
+      if (chatId == null) {
+        chatId = await createChat(modelName: _loadedModelName);
+        if (!mounted || generation != _modelGeneration) return;
+        final chat = await getChat(chatId);
+        if (chat == null) {
+          throw StateError('The new chat could not be loaded.');
+        }
+        setState(() {
+          _chatId = chatId;
+          _chatTitle = chat.title;
+          _chatNameController.text = chat.title;
+        });
+      }
+      await addChatMessage(chatId: chatId, isAI: false, text: text);
+
+      await for (final delta in _chatService.sendMessage(text)) {
+        if (!mounted || generation != _modelGeneration) break;
+        if (delta.text.isEmpty) continue;
+        setState(() => reply.text += delta.text);
+        _scrollToBottom();
+      }
       if (!mounted || generation != _modelGeneration) return;
-      final responseText = response.text.trim();
       setState(() {
         _isGenerating = false;
-        if (responseText.isEmpty) {
+        if (reply.text.trim().isEmpty) {
           reply
             ..error = true
             ..text = 'The model returned an empty response.';
-        } else {
-          reply.text = responseText;
         }
       });
+      if (reply.text.trim().isNotEmpty) {
+        await addChatMessage(
+          chatId: chatId,
+          isAI: true,
+          text: reply.text.trim(),
+        );
+      }
       _scrollToBottom();
     } catch (error) {
       if (mounted && generation == _modelGeneration) {
         setState(() {
           _isGenerating = false;
-          reply
-            ..error = true
-            ..text = 'Could not generate a response: $error';
+          reply.error = true;
+          reply.text = reply.text.isEmpty
+              ? 'Could not generate a response: $error'
+              : '${reply.text}\n\nCould not save response: $error';
         });
+      }
+    }
+  }
+
+  Future<void> _startNewChat() async {
+    if (_isGenerating) return;
+    _chatService.startNewChat();
+    setState(() {
+      _chatId = null;
+      _chatTitle = 'New chat';
+      _chatNameController.text = _chatTitle;
+      _messages.clear();
+      _modelError = null;
+    });
+  }
+
+  Future<void> _openChatHistory() async {
+    final chat = await Navigator.push<ChatSession>(
+      context,
+      MaterialPageRoute<ChatSession>(
+        builder: (context) => const ChatHistoryPage(),
+      ),
+    );
+    if (chat == null || !mounted) return;
+
+    try {
+      final history = await getChatMessages(chat.id);
+      if (!mounted) return;
+      _chatService.restoreHistory(history);
+      setState(() {
+        _chatId = chat.id;
+        _chatTitle = chat.title;
+        _chatNameController.text = chat.title;
+        _messages
+          ..clear()
+          ..addAll(
+            history.map(
+              (message) =>
+                  _ChatMessage(isUser: !message.isAI, text: message.text),
+            ),
+          );
+        _modelError = null;
+      });
+      _scrollToBottom();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open chat: $error')));
+      }
+    }
+  }
+
+  Future<void> _renameCurrentChat(String title) async {
+    final chatId = _chatId;
+    final trimmedTitle = title.trim();
+    if (chatId == null || trimmedTitle.isEmpty || trimmedTitle == _chatTitle) {
+      _chatNameController.text = _chatTitle;
+      return;
+    }
+    try {
+      await renameChat(chatId, trimmedTitle);
+      if (!mounted || chatId != _chatId) return;
+      setState(() => _chatTitle = trimmedTitle);
+    } catch (error) {
+      _chatNameController.text = _chatTitle;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not rename chat: $error')),
+        );
       }
     }
   }
@@ -175,9 +277,11 @@ class _ChatPageState extends State<ChatPage>
     return Scaffold(
       backgroundColor: MyColors.background,
       appBar: AppBar(
-        title: _isModelSelected
+        title: _isModelSelected || _chatId != null
             ? TextFormField(
                 controller: _chatNameController,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: _renameCurrentChat,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -195,20 +299,20 @@ class _ChatPageState extends State<ChatPage>
             : const Text('Chat', style: TextStyle(color: Colors.white)),
         backgroundColor: MyColors.primary,
         actions: [
+          if (_chatId != null || _messages.isNotEmpty)
+            IconButton(
+              onPressed: _isGenerating ? null : _startNewChat,
+              tooltip: 'New chat',
+              icon: const Icon(Icons.add, color: Colors.white),
+            ),
           IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (context) => const ChatHistoryPage(),
-                ),
-              );
-            },
+            onPressed: _isGenerating ? null : _openChatHistory,
+            tooltip: 'Chat history',
             icon: const Icon(Icons.menu, color: Colors.white),
           ),
         ],
       ),
-      body: !_isModelSelected
+      body: !_isModelSelected && _messages.isEmpty
           ? Center(
               child: PleaseDownloadModelWidget(
                 changePageToChat: () => widget.onChangeIndex(1),
@@ -272,6 +376,7 @@ class _ChatPageState extends State<ChatPage>
                           child: TextField(
                             controller: _messageController,
                             enabled:
+                                _isModelSelected &&
                                 !_isModelLoading &&
                                 _modelError == null &&
                                 !_isGenerating,
@@ -292,7 +397,8 @@ class _ChatPageState extends State<ChatPage>
                         const SizedBox(width: 8),
                         IconButton.filled(
                           onPressed:
-                              !_isModelLoading &&
+                              _isModelSelected &&
+                                  !_isModelLoading &&
                                   _modelError == null &&
                                   !_isGenerating
                               ? _sendMessage
