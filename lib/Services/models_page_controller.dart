@@ -26,11 +26,16 @@ class ModelsPageController extends ChangeNotifier {
     final name = await getSelectedModelName();
     if (_disposed) return;
 
-    selectedModelName = name;
-    selectedModelId = models
+    final selectedModel = models
         .where((model) => model.name == name)
-        .firstOrNull
-        ?.id;
+        .firstOrNull;
+    if (name != 'none' && selectedModel == null) {
+      await changeConfigSelectedModelName('none');
+      if (_disposed) return;
+    }
+
+    selectedModelName = selectedModel?.name ?? 'none';
+    selectedModelId = selectedModel?.id;
     notifyListeners();
   }
 

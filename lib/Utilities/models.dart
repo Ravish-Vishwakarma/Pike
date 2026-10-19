@@ -48,16 +48,6 @@ const Map<String, AIModel> allModels = {
     parameters: "4B",
     modalities: [ModelModality.text],
   ),
-  "llama-3.2-1b": AIModel(
-    id: 3,
-    name: "Llama3 1B",
-    filename: "llama3_2_1b_mixed_int4_gpu.litertlm",
-    download:
-        "https://huggingface.co/litert-community/Llama-3.2-1B/resolve/main/llama3_2_1b_mixed_int4_gpu.litertlm",
-    size: "964 MB",
-    parameters: "1B",
-    modalities: [ModelModality.text],
-  ),
   "qwen3-0.6b": AIModel(
     id: 4,
     name: "Qwen3 6B",
