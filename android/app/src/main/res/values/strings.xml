@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pike</string>
+    <string name="app_description">Run local AI models and chat privately on your device, including with vision-capable models.</string>
+</resources>

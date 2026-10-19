@@ -1,4 +1,4 @@
-package com.example.pike
+package com.ravish.pike
 
 import io.flutter.embedding.android.FlutterActivity
 

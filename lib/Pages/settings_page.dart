@@ -33,7 +33,9 @@ class _SettingsPageState extends State<SettingsPage>
 
   void _onChatListChanged() {
     if (!mounted) return;
-    setState(() => _chatHistoryFuture = getAllChats());
+    setState(() {
+      _chatHistoryFuture = getAllChats();
+    });
   }
 
   Future<void> _loadSelectedModelName() async {

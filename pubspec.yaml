@@ -1,5 +1,5 @@
 name: pike
-description: "A new Flutter project."
+description: "Pike is an on-device AI chat app with downloadable local text and vision models."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
