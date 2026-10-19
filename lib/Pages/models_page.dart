@@ -20,8 +20,9 @@ class _ModelsPageState extends State<ModelsPage>
   // -------------------- VARIABLES -------------------- //
   String modelName = "";
   final models = allModels.values.toList();
-  Set<String> downloadedModels = {};
+  List<AIModel> availableModels = [];
   List<AIModel> downloadableModel = [];
+  int? selectedModelId = 1;
 
   // ------------------- Functions -------------------- //
   Future<void> getModelName() async {
@@ -34,20 +35,24 @@ class _ModelsPageState extends State<ModelsPage>
     });
   }
 
-  Future<void> loadDownloadableModels() async {
+  Future<void> loadModels() async {
     final files = await Downloader.getAllDownloadedFiles();
-
-    if (!mounted) return;
 
     final fileNames = files.map((file) => p.basename(file)).toSet();
 
-    final availableModels = models.where((model) {
+    final downloaded = models.where((model) {
+      return fileNames.contains(model.filename);
+    }).toList();
+
+    final available = models.where((model) {
       return !fileNames.contains(model.filename);
     }).toList();
 
+    if (!mounted) return;
+
     setState(() {
-      downloadedModels = fileNames;
-      downloadableModel = availableModels;
+      availableModels = downloaded;
+      downloadableModel = available;
     });
   }
 
@@ -56,7 +61,7 @@ class _ModelsPageState extends State<ModelsPage>
   void initState() {
     super.initState();
     getModelName();
-    loadDownloadableModels();
+    loadModels();
   }
 
   // -------------------- BUILDER -------------------- //
@@ -80,7 +85,7 @@ class _ModelsPageState extends State<ModelsPage>
           children: [
             ElevatedButton(
               onPressed: () {
-                print(downloadedModels);
+                print(availableModels);
                 for (var mo in downloadableModel) {
                   print(mo.filename);
                 }
@@ -90,7 +95,35 @@ class _ModelsPageState extends State<ModelsPage>
             SelectedModelWidget(modelName: modelName),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-              child: Divider(),
+              child: Row(
+                spacing: 4,
+                children: [
+                  Expanded(child: Divider()),
+                  Text("Available"),
+                  Expanded(child: Divider()),
+                ],
+              ),
+            ),
+
+            DownloadedModelWidget(
+              models: availableModels,
+              selectedModelChange: (id) {
+                setState(() {
+                  selectedModelId = id;
+                });
+                print('Selected model ID: $id');
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              child: Row(
+                spacing: 4,
+                children: [
+                  Expanded(child: Divider()),
+                  Text("Downloadable"),
+                  Expanded(child: Divider()),
+                ],
+              ),
             ),
             ListView.builder(
               shrinkWrap: true,
@@ -101,6 +134,7 @@ class _ModelsPageState extends State<ModelsPage>
                 return ModelDownloadCard(model: model);
               },
             ),
+
             SizedBox(height: 50),
           ],
         ),
@@ -175,7 +209,7 @@ class ModelDownloadCard extends StatelessWidget {
               padding: const EdgeInsets.all(0),
               child: Column(
                 children: [
-                  Text('Model ID: ${model.id}'),
+                  Text('file: ${model.filename}'),
                   const SizedBox(height: 8),
                   ElevatedButton(
                     onPressed: () {
@@ -210,6 +244,52 @@ class ModelDownloadCard extends StatelessWidget {
           color: Colors.black87,
         ),
       ),
+    );
+  }
+}
+
+// ====================================================================== //
+
+class DownloadedModelWidget extends StatefulWidget {
+  final ValueChanged<int?> selectedModelChange;
+  final List<AIModel> models;
+
+  const DownloadedModelWidget({
+    super.key,
+    required this.selectedModelChange,
+    required this.models,
+  });
+
+  @override
+  State<DownloadedModelWidget> createState() => _DownloadedModelWidgetState();
+}
+
+class _DownloadedModelWidgetState extends State<DownloadedModelWidget> {
+  int? selectedModelId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        RadioGroup<int>(
+          groupValue: selectedModelId,
+          onChanged: (value) {
+            setState(() {
+              selectedModelId = value;
+            });
+
+            widget.selectedModelChange(value);
+          },
+          child: Column(
+            children: widget.models.map((model) {
+              return RadioListTile<int>(
+                title: Text(model.name),
+                value: model.id,
+              );
+            }).toList(),
+          ),
+        ),
+      ],
     );
   }
 }
