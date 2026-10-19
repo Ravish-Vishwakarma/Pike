@@ -19,10 +19,10 @@ class _ModelsPageState extends State<ModelsPage>
 
   // -------------------- VARIABLES -------------------- //
   String modelName = "";
+  int? selectedModelId = 1;
   final models = allModels.values.toList();
   List<AIModel> availableModels = [];
   List<AIModel> downloadableModel = [];
-  int? selectedModelId = 1;
 
   // ------------------- Functions -------------------- //
   Future<void> getModelName() async {
@@ -35,7 +35,7 @@ class _ModelsPageState extends State<ModelsPage>
     });
   }
 
-  Future<void> loadModels() async {
+  Future<void> loadModelsList() async {
     final files = await Downloader.getAllDownloadedFiles();
 
     final fileNames = files.map((file) => p.basename(file)).toSet();
@@ -61,7 +61,7 @@ class _ModelsPageState extends State<ModelsPage>
   void initState() {
     super.initState();
     getModelName();
-    loadModels();
+    loadModelsList();
   }
 
   // -------------------- BUILDER -------------------- //
@@ -85,8 +85,7 @@ class _ModelsPageState extends State<ModelsPage>
           children: [
             ElevatedButton(
               onPressed: () {
-                print(availableModels);
-                for (var mo in downloadableModel) {
+                for (var mo in availableModels) {
                   print(mo.filename);
                 }
               },
@@ -280,14 +279,41 @@ class _DownloadedModelWidgetState extends State<DownloadedModelWidget> {
 
             widget.selectedModelChange(value);
           },
-          child: Column(
-            children: widget.models.map((model) {
-              return RadioListTile<int>(
-                title: Text(model.name),
-                value: model.id,
-              );
-            }).toList(),
-          ),
+          child: widget.models.isNotEmpty
+              ? Column(
+                  children: widget.models.map((model) {
+                    return RadioListTile<int>(
+                      title: Text(model.name),
+                      subtitle: Text("${model.parameters} - ${model.size}"),
+                      value: model.id,
+                      secondary: IconButton(
+                        onPressed: () {
+                          Downloader.deleteModel(model.filename);
+                        },
+                        icon: Icon(Icons.delete),
+                      ),
+                    );
+                  }).toList(),
+                )
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Container(
+                        padding: EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: MyColors.surfaceLight.withAlpha(130),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          "No Model Downloaded\nPlease download a model to select",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.black),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
         ),
       ],
     );

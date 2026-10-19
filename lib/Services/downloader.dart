@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:background_downloader/background_downloader.dart';
 
 class Downloader {
@@ -54,12 +56,46 @@ class Downloader {
   static Future<List<String>> getAllDownloadedFiles() async {
     final records = await FileDownloader().database.allRecords();
 
-    final completedRecords = records
-        .where((record) => record.status == TaskStatus.complete)
-        .toList();
+    final completedRecords = records.where(
+      (record) => record.status == TaskStatus.complete,
+    );
 
-    return await Future.wait(
+    final paths = await Future.wait(
       completedRecords.map((record) => record.task.filePath()),
     );
+
+    final existingPaths = <String>[];
+
+    for (final path in paths) {
+      if (await File(path).exists()) {
+        existingPaths.add(path);
+      }
+    }
+
+    return existingPaths;
+  }
+
+  static Future<void> deleteModel(String fileName) async {
+    final records = await FileDownloader().database.allRecords();
+
+    for (final record in records) {
+      if (record.task.filename == fileName &&
+          record.status == TaskStatus.complete) {
+        final filePath = await record.task.filePath();
+        final file = File(filePath);
+
+        if (await file.exists()) {
+          await file.delete();
+
+          print('Model deleted successfully: $filePath');
+        } else {
+          print('Model file does not exist: $filePath');
+        }
+
+        return;
+      }
+    }
+
+    print('No completed download found for: $fileName');
   }
 }
