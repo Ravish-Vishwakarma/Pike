@@ -1,12 +1,15 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:pike/Pages/chat_history_page.dart';
 import 'package:pike/Services/config.dart';
 import 'package:pike/Services/db.dart';
 import 'package:pike/Services/local_chat_service.dart';
 import 'package:pike/Utilities/colors.dart';
 import 'package:pike/Utilities/model_not_downloaded_navigator.dart';
+import 'package:pike/Utilities/models.dart';
 
 class ChatPage extends StatefulWidget {
   final ValueChanged<int> onChangeIndex;
@@ -22,9 +25,11 @@ class _ChatPageState extends State<ChatPage>
   final TextEditingController _messageController = TextEditingController();
   final TextEditingController _chatNameController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ImagePicker _imagePicker = ImagePicker();
   final LocalChatService _chatService = LocalChatService();
   final List<_ChatMessage> _messages = [];
 
+  Uint8List? _selectedImageBytes;
   String _loadedModelName = 'none';
   String? _modelError;
   bool _isModelSelected = false;
@@ -33,6 +38,9 @@ class _ChatPageState extends State<ChatPage>
   int _modelGeneration = 0;
   int? _chatId;
   String _chatTitle = 'New chat';
+  bool get _supportsVision => allModels.values.any(
+    (model) => model.name == _loadedModelName && model.supportsVision,
+  );
 
   @override
   bool get wantKeepAlive => true;
@@ -53,6 +61,7 @@ class _ChatPageState extends State<ChatPage>
       _chatTitle = 'New chat';
       _chatNameController.text = _chatTitle;
       _messages.clear();
+      _selectedImageBytes = null;
       _isGenerating = false;
     });
   }
@@ -118,9 +127,34 @@ class _ChatPageState extends State<ChatPage>
     unawaited(_loadModel(_loadedModelName, generation));
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 90,
+      );
+      if (image == null) return;
+      final bytes = await image.readAsBytes();
+      if (bytes.isEmpty) {
+        throw StateError('The selected image is empty.');
+      }
+      if (!mounted) return;
+      setState(() => _selectedImageBytes = bytes);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not load image: $error')));
+      }
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty ||
+    final imageBytes = _selectedImageBytes;
+    if ((text.isEmpty && imageBytes == null) ||
         _isModelLoading ||
         _isGenerating ||
         _modelError != null) {
@@ -132,8 +166,9 @@ class _ChatPageState extends State<ChatPage>
     final generation = _modelGeneration;
     setState(() {
       _messages
-        ..add(_ChatMessage(isUser: true, text: text))
+        ..add(_ChatMessage(isUser: true, text: text, imageBytes: imageBytes))
         ..add(reply);
+      _selectedImageBytes = null;
       _isGenerating = true;
     });
     _scrollToBottom();
@@ -152,9 +187,17 @@ class _ChatPageState extends State<ChatPage>
           _chatNameController.text = chat.title;
         });
       }
-      await addChatMessage(chatId: chatId, isAI: false, text: text);
+      await addChatMessage(
+        chatId: chatId,
+        isAI: false,
+        text: text,
+        imageBytes: imageBytes,
+      );
 
-      await for (final delta in _chatService.sendMessage(text)) {
+      await for (final delta in _chatService.sendMessage(
+        text,
+        imageBytes: imageBytes,
+      )) {
         if (!mounted || generation != _modelGeneration) break;
         if (delta.text.isEmpty) continue;
         setState(() => reply.text += delta.text);
@@ -198,6 +241,7 @@ class _ChatPageState extends State<ChatPage>
       _chatTitle = 'New chat';
       _chatNameController.text = _chatTitle;
       _messages.clear();
+      _selectedImageBytes = null;
       _modelError = null;
     });
   }
@@ -216,6 +260,7 @@ class _ChatPageState extends State<ChatPage>
       if (!mounted) return;
       _chatService.restoreHistory(history);
       setState(() {
+        _selectedImageBytes = null;
         _chatId = chat.id;
         _chatTitle = chat.title;
         _chatNameController.text = chat.title;
@@ -223,8 +268,11 @@ class _ChatPageState extends State<ChatPage>
           ..clear()
           ..addAll(
             history.map(
-              (message) =>
-                  _ChatMessage(isUser: !message.isAI, text: message.text),
+              (message) => _ChatMessage(
+                isUser: !message.isAI,
+                text: message.text,
+                imageBytes: message.imageBytes,
+              ),
             ),
           );
         _modelError = null;
@@ -383,41 +431,90 @@ class _ChatPageState extends State<ChatPage>
                   top: false,
                   child: Padding(
                     padding: const EdgeInsets.all(8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _messageController,
-                            enabled:
-                                _isModelSelected &&
-                                !_isModelLoading &&
-                                _modelError == null &&
-                                !_isGenerating,
-                            minLines: 1,
-                            maxLines: 5,
-                            textInputAction: TextInputAction.send,
-                            onSubmitted: (_) => _sendMessage(),
-                            decoration: const InputDecoration(
-                              hintText: 'Message',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
+                        if (_selectedImageBytes case final imageBytes?)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.memory(
+                                      imageBytes,
+                                      width: 96,
+                                      height: 96,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 2,
+                                    right: 2,
+                                    child: IconButton.filledTonal(
+                                      tooltip: 'Remove image',
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () => setState(
+                                        () => _selectedImageBytes = null,
+                                      ),
+                                      icon: const Icon(Icons.close, size: 18),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton.filled(
-                          onPressed:
-                              _isModelSelected &&
-                                  !_isModelLoading &&
-                                  _modelError == null &&
-                                  !_isGenerating
-                              ? _sendMessage
-                              : null,
-                          icon: const Icon(Icons.send),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            if (_supportsVision)
+                              IconButton(
+                                onPressed:
+                                    !_isModelSelected ||
+                                        _isModelLoading ||
+                                        _modelError != null ||
+                                        _isGenerating
+                                    ? null
+                                    : _pickImage,
+                                tooltip: 'Attach image',
+                                icon: const Icon(Icons.image_outlined),
+                              ),
+                            Expanded(
+                              child: TextField(
+                                controller: _messageController,
+                                enabled:
+                                    _isModelSelected &&
+                                    !_isModelLoading &&
+                                    _modelError == null &&
+                                    !_isGenerating,
+                                minLines: 1,
+                                maxLines: 5,
+                                textInputAction: TextInputAction.send,
+                                onSubmitted: (_) => _sendMessage(),
+                                decoration: const InputDecoration(
+                                  hintText: 'Message',
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton.filled(
+                              onPressed:
+                                  _isModelSelected &&
+                                      !_isModelLoading &&
+                                      _modelError == null &&
+                                      !_isGenerating
+                                  ? _sendMessage
+                                  : null,
+                              icon: const Icon(Icons.send),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -432,9 +529,10 @@ class _ChatPageState extends State<ChatPage>
 class _ChatMessage {
   final bool isUser;
   String text;
+  final Uint8List? imageBytes;
   bool error = false;
 
-  _ChatMessage({required this.isUser, required this.text});
+  _ChatMessage({required this.isUser, required this.text, this.imageBytes});
 }
 
 class _MessageBubble extends StatelessWidget {
@@ -468,7 +566,30 @@ class _MessageBubble extends StatelessWidget {
                 height: 20,
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
               )
-            : SelectableText(message.text),
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (message.imageBytes case final imageBytes?)
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: message.text.isEmpty ? 0 : 8,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.memory(
+                          imageBytes,
+                          width: 240,
+                          height: 200,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Text('Could not display this image.'),
+                        ),
+                      ),
+                    ),
+                  if (message.text.isNotEmpty) SelectableText(message.text),
+                ],
+              ),
       ),
     );
   }

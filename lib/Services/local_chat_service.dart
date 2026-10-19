@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:litertlm/litertlm.dart';
 import 'package:pike/Services/downloader.dart';
 import 'package:pike/Services/db.dart';
@@ -13,18 +15,11 @@ class LocalChatService {
 
   void restoreHistory(List<ChatMessage> messages) {
     _history.clear();
-    ChatMessage? pendingUserMessage;
     for (final message in messages) {
       if (message.isAI) {
-        final userMessage = pendingUserMessage;
-        if (userMessage != null) {
-          _history
-            ..add(Message.user(userMessage.text))
-            ..add(Message.modelText(message.text));
-          pendingUserMessage = null;
-        }
+        _history.add(Message.modelText(message.text));
       } else {
-        pendingUserMessage = message;
+        _history.add(_createUserMessage(message.text, message.imageBytes));
       }
     }
   }
@@ -57,6 +52,7 @@ class LocalChatService {
       engineConfig: EngineConfig(
         modelPath: modelPath,
         backend: const Backend.cpu(),
+        visionBackend: model.supportsVision ? const Backend.cpu() : null,
       ),
     );
     try {
@@ -73,7 +69,7 @@ class LocalChatService {
     }
   }
 
-  Stream<Message> sendMessage(String text) async* {
+  Stream<Message> sendMessage(String text, {Uint8List? imageBytes}) async* {
     final engine = _engine;
     if (engine == null) {
       throw StateError('The selected model is not ready.');
@@ -114,7 +110,7 @@ class LocalChatService {
       _activeConversation = conversation;
 
       await for (final message in conversation.sendMessageStream(
-        Message.user(text),
+        _createUserMessage(text, imageBytes),
       )) {
         if (message.isEmpty) continue;
         responseText.write(message.text);
@@ -126,7 +122,7 @@ class LocalChatService {
         throw StateError('The model returned an empty response.');
       }
       _history
-        ..add(Message.user(text))
+        ..add(_createUserMessage(text, imageBytes))
         ..add(Message.modelText(responseText.toString().trim()));
     } finally {
       try {
@@ -141,6 +137,13 @@ class LocalChatService {
         _isSending = false;
       }
     }
+  }
+
+  Message _createUserMessage(String text, Uint8List? imageBytes) {
+    final contents = <Content>[];
+    if (text.isNotEmpty) contents.add(Content.text(text));
+    if (imageBytes != null) contents.add(Content.imageBytes(imageBytes));
+    return Message.userContents(Contents(contents));
   }
 
   Future<void> unload() async {

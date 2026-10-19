@@ -13,7 +13,7 @@ Future<Database> get database async {
   final dbPath = await getDatabasesPath();
   _database = await openDatabase(
     join(dbPath, 'app.db'),
-    version: 2,
+    version: 3,
     onCreate: (db, version) async {
       await _createChatTables(db);
     },
@@ -26,6 +26,9 @@ Future<Database> get database async {
           FROM chat
           WHERE chat_id IS NOT NULL
         ''');
+      }
+      if (oldVersion < 3) {
+        await db.execute('ALTER TABLE chat ADD COLUMN image_data BLOB');
       }
     },
   );
@@ -94,6 +97,7 @@ Future<int> addChatMessage({
   required int chatId,
   required bool isAI,
   required String text,
+  Uint8List? imageBytes,
 }) async {
   final db = await database;
   return db.transaction((transaction) async {
@@ -101,6 +105,7 @@ Future<int> addChatMessage({
       'chat_id': chatId,
       'isAI': isAI ? 1 : 0,
       'chat': text,
+      'image_data': imageBytes,
     });
     final changedRows = await transaction.update(
       'conversations',
@@ -166,7 +171,8 @@ Future<void> _createChatTables(DatabaseExecutor db) async {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       isAI INTEGER NOT NULL,
       chat_id INTEGER NOT NULL,
-      chat TEXT NOT NULL
+      chat TEXT NOT NULL,
+      image_data BLOB
     )
   ''');
 }
@@ -214,12 +220,14 @@ class ChatMessage {
   final int chatId;
   final bool isAI;
   final String text;
+  final Uint8List? imageBytes;
 
   const ChatMessage({
     required this.id,
     required this.chatId,
     required this.isAI,
     required this.text,
+    this.imageBytes,
   });
 
   factory ChatMessage.fromMap(Map<String, Object?> map) {
@@ -228,6 +236,7 @@ class ChatMessage {
       chatId: map['chat_id'] as int,
       isAI: map['isAI'] == 1,
       text: map['chat'] as String,
+      imageBytes: map['image_data'] as Uint8List?,
     );
   }
 }
