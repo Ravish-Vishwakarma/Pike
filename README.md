@@ -21,6 +21,18 @@
 - Save conversations locally, then reopen, rename, or delete them.
 - Clear all saved conversations from Settings.
 
+## Screenshots
+
+| Text Chat | Image Chat |
+|:---------:|:----------:|
+| ![Text Chat](Resources/App%20UI%20Images/Chat%20Page%20Text.png) | ![Image Chat](Resources/App%20UI%20Images/Chat%20Page%20Image.png) |
+| Chat with a local text model | Ask questions about an image with a vision model |
+
+| Models | Chat History |
+|:------:|:------------:|
+| ![Models](Resources/App%20UI%20Images/Models%20Page.png) | ![Chat History](Resources/App%20UI%20Images/Chat%20History.png) |
+| Browse, download, and select local models | Browse and manage saved conversations |
+
 An internet connection is needed to download models. After downloading, inference runs locally. Models take significant storage space; the approximate download sizes are listed below.
 
 ## Models
